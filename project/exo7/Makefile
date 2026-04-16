@@ -1,4 +1,4 @@
-APPLICATION = exercice1_lampe
+APPLICATION = exercice_addresses
 BOARD ?= unwd-range-l1-r3
 RIOTBASE ?= $(CURDIR)/../..
 
