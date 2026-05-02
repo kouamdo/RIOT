@@ -1,7 +1,8 @@
 # RIOT Project
 
 This directory contains several exercises and small demos built with the RIOT
-embedded operating system, mainly targeting the `unwd-range-l1-r3` board.
+embedded operating system, now configured by default for a generic ESP32
+development board (`esp32-wroom-32` in RIOT).
 
 Each exercise generally includes:
 
@@ -41,13 +42,137 @@ make clean all
 
 The `Makefile` files are configured by default for:
 
-- `BOARD ?= unwd-range-l1-r3`
+- `BOARD ?= esp32-wroom-32`
 
 The following command is used to flash and open a serial terminal on the board:
 
 ```bash
-make BOARD=unwd-range-l1-r3 PROGRAMMER=openocd flash term
+make BOARD=esp32-wroom-32 flash term
 ```
+
+If you use another RIOT ESP32 board definition, you can still override it from
+the command line, for example:
+
+```bash
+make BOARD=esp32s3-devkit flash term
+```
+
+## Commands Used To Make ESP32 Work
+
+Below is the full command sequence that was used in practice to make the ESP32
+toolchain and flashing work under WSL with a CH340 USB serial adapter.
+
+### 1. Install prerequisites and the ESP32 toolchain
+
+Run from the RIOT root:
+
+```bash
+cd /mnt/e/RIOT
+sudo apt update
+sudo apt install -y curl python3 python3-serial telnet
+./dist/tools/esptools/install.sh esp32
+```
+
+If the toolchain was installed under `/root/.espressif`, export that path:
+
+```bash
+export IDF_TOOLS_PATH=/root/.espressif
+. ./dist/tools/esptools/export.sh esp32
+```
+
+Optional checks:
+
+```bash
+which xtensa-esp32-elf-gcc
+xtensa-esp32-elf-gcc --version
+```
+
+### 2. Attach the ESP32 USB device to WSL from Windows
+
+In a Windows terminal:
+
+```powershell
+usbipd list
+```
+
+Then attach the correct BUSID to WSL if needed:
+
+```powershell
+usbipd bind --busid 1-1
+usbipd attach --wsl --busid 1-1
+```
+
+### 3. Check that Linux sees the USB adapter
+
+In WSL:
+
+```bash
+lsusb
+```
+
+For the board used here, the USB/serial converter was:
+
+- `1a86:7523` (`CH340/CH341`)
+
+### 4. Load the USB serial driver in WSL
+
+If `/dev/ttyUSB0` does not appear automatically, load the kernel module:
+
+```bash
+dmesg | tail -50
+modprobe ch341
+dmesg | tail -50
+ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+```
+
+If needed, you can also load the generic USB serial layer first:
+
+```bash
+modprobe usbserial
+modprobe ch341
+```
+
+### 5. Build an exercise
+
+Example with `exo2`:
+
+```bash
+cd /mnt/e/RIOT/project/exo2
+make BOARD=esp32-wroom-32
+```
+
+### 6. Flash the board
+
+If the port is `/dev/ttyUSB0`:
+
+```bash
+make BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash
+```
+
+To flash and open the serial terminal in one command:
+
+```bash
+make BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### 7. Useful troubleshooting commands
+
+```bash
+ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+dmesg | grep -iE 'ch34|ch341|ttyUSB|usbserial' | tail -20
+uname -r
+```
+
+## Wiring Notes For GPIO Exercises
+
+Some exercises use external LEDs or buttons. For the ESP32 versions, the pins
+are now defined directly in the source files and can be changed easily if your
+wiring differs.
+
+- `exo2`: default buttons on GPIO18, GPIO19, GPIO21, GPIO22 and status LED on
+  GPIO2
+- `exo3`: default traffic-light LEDs on GPIO16, GPIO17, GPIO18 and pedestrian
+  button on GPIO19
 
 ## Purpose
 

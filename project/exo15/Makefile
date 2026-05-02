@@ -1,5 +1,5 @@
 APPLICATION = exercice15_i2c
-BOARD ?= unwd-range-l1-r3
+BOARD ?= esp32-wroom-32
 RIOTBASE ?= $(CURDIR)/../..
 
 USEMODULE += periph_i2c

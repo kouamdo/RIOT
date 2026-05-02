@@ -44,7 +44,7 @@ int cmd_info(int argc, char **argv)
     (void)argc;
     (void)argv;
     printf("Board: %s\n", RIOT_BOARD);
-    printf("Microcontroller: STM32L151\n");
+    puts("Microcontroller: depends on the selected RIOT board");
     printf("Uptime: about %lu seconds\n", xtimer_now_usec() / 1000000);
     return 0;
 }

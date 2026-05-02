@@ -1,5 +1,5 @@
 APPLICATION = exercice1_lampe
-BOARD ?= unwd-range-l1-r3
+BOARD ?= esp32-wroom-32
 RIOTBASE ?= $(CURDIR)/../..
 
 # Modules nécessaires pour l'exercice 1

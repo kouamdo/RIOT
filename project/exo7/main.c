@@ -15,6 +15,7 @@ void my_function(void) {
 int main(void) {
     puts("=== Memory Exploration (Exercise 7) ===\n");
     
+    
     /* Local variables */
     int local_int = 10;
     static int local_static_int = 20;
