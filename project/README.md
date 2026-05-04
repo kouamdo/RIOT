@@ -13,6 +13,7 @@ Each exercise generally includes:
 
 The directory currently contains the following subprojects:
 
+- `exo1`: lamp with one button and one LED
 - `exo2`: code lock with buttons
 - `exo3`: traffic light with pedestrian button
 - `exo6`: simple benchmark based on an integer workload
@@ -169,10 +170,23 @@ Some exercises use external LEDs or buttons. For the ESP32 versions, the pins
 are now defined directly in the source files and can be changed easily if your
 wiring differs.
 
+- `exo1`: integrated button via `BTN0_PIN` and integrated LED on `GPIO2`
 - `exo2`: default buttons on GPIO18, GPIO19, GPIO21, GPIO22 and status LED on
   GPIO2
 - `exo3`: default traffic-light LEDs on GPIO16, GPIO17, GPIO18 and pedestrian
   button on GPIO19
+
+## Exercise 1
+
+`exo1` implements a lamp/switch exercise for ESP32 with the integrated button
+and LED:
+
+- short press: enable or stop LED blinking
+- long press: change the blinking frequency
+- debounce: handled by disabling the GPIO interrupt, then validating the button
+  state in the main loop
+- periodic polling: the main loop checks button release, long-press duration,
+  and LED blink timing
 
 ## Purpose
 
