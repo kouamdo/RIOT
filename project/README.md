@@ -16,6 +16,7 @@ The directory currently contains the following subprojects:
 - `exo1`: lamp with one button and one LED
 - `exo2`: code lock with buttons
 - `exo3`: traffic light with pedestrian button
+- `exo4`: Morse code encoding and decoding with GPIO
 - `exo6`: simple benchmark based on an integer workload
 - `exo7`: memory exploration and address display
 - `exo8`: priority inversion demonstration
@@ -175,6 +176,7 @@ wiring differs.
   GPIO2
 - `exo3`: default traffic-light LEDs on GPIO16, GPIO17, GPIO18 and pedestrian
   button on GPIO19
+- `exo4`: integrated button via `BTN0_PIN` and integrated LED on `GPIO2`
 
 ## Exercise 1
 
@@ -187,6 +189,17 @@ and LED:
   state in the main loop
 - periodic polling: the main loop checks button release, long-press duration,
   and LED blink timing
+
+## Exercise 4
+
+`exo4` implements Morse code with the GPIO elements directly available on the
+ESP32 board:
+
+- encoding: the integrated LED blinks the message `RIOT ESP32` in Morse code
+- decoding: the integrated BOOT button is used to enter Morse code manually
+- short press: dot
+- long press: dash
+- end of letter: detected after a short silence, then decoded and printed
 
 ## Purpose
 
