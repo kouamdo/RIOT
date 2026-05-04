@@ -23,6 +23,7 @@ The directory currently contains the following subprojects:
 - `exo8_2`: deadlock demonstration
 - `exo14`: RIOT shell with custom commands
 - `exo15`: I2C address scan
+- `exo16`: Modbus RTU slave on the console UART
 - `exo22`: exercise in progress / to be completed
 
 ## Build
@@ -177,6 +178,7 @@ wiring differs.
 - `exo3`: default traffic-light LEDs on GPIO16, GPIO17, GPIO18 and pedestrian
   button on GPIO19
 - `exo4`: integrated button via `BTN0_PIN` and integrated LED on `GPIO2`
+- `exo16`: integrated LED on `GPIO2`, console UART used for Modbus RTU
 
 ## Exercise 1
 
@@ -200,6 +202,22 @@ ESP32 board:
 - short press: dot
 - long press: dash
 - end of letter: detected after a short silence, then decoded and printed
+
+## Exercise 16
+
+`exo16` implements a simple Modbus RTU slave over the standard console UART:
+
+- UART: `UART_DEV(0)` at `115200` baud
+- slave ID: `1`
+- function codes: `0x03`, `0x06`, `0x10`
+- simulated sensor registers:
+- register `0`: temperature in tenths of a degree
+- register `1`: humidity in tenths of a percent
+- register `2`: pressure in tenths of hPa
+- register `3`: LED state (`0` = off, non-zero = on)
+
+This exercise is intended to be tested from a serial Modbus RTU master such as
+Termite on the host machine.
 
 ## Purpose
 
