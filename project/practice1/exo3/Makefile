@@ -1,14 +1,8 @@
-APPLICATION = exo3_annonceur
+APPLICATION = exo3_traffic_light
 BOARD ?= esp32-wroom-32
-RIOTBASE ?= $(CURDIR)/../..
+RIOTBASE ?= $(CURDIR)/../../..
 
-USEMODULE += skald
-USEMODULE += skald_eddystone
+USEMODULE += periph_gpio
 USEMODULE += xtimer
-
-DISABLE_MODULE += nimble_netif
-DISABLE_MODULE += nimble_ll
-
-CFLAGS += -DSKALD_INTERVAL_US=1000000UL
 
 include $(RIOTBASE)/Makefile.include
