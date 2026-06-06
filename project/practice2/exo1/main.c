@@ -1,91 +1,124 @@
 /*
- * Practice 2, Exercise 1: LoRaWAN Random Retry Intervals
- * 
- * This exercise implements randomized retry intervals for LoRaWAN
- * JoinRequest and data transmission packets as required by the
- * LoRaWAN specification.
- * 
- * Objectives:
- * - Implement random backoff for transmission retries
- * - Comply with LoRaWAN specification
- * - Use RIOT's random number generation
+ * Practice 2, Exercise 1: LoRaWAN-style random retry intervals.
+ *
+ * The real LoRaWAN MAC is not used here because the current target is a single
+ * ESP32 board without LoRa radio hardware. This program demonstrates the part
+ * requested by the exercise: each retry delay is chosen randomly inside a
+ * bounded window, as would be done for JoinRequest or confirmed uplink retries.
  */
 
-#include <stdio.h>
 #include <stdint.h>
-#include <random.h>
-#include <xtimer.h>
+#include <stdio.h>
 
-/* Compile-time configuration */
-#ifndef RETRY_MIN_DELAY_MS
-#define RETRY_MIN_DELAY_MS      1000    /* Minimum retry delay in milliseconds */
+#include "random.h"
+#include "xtimer.h"
+
+#ifndef JOIN_RETRY_MIN_MS
+#define JOIN_RETRY_MIN_MS       (1000U)
 #endif
 
-#ifndef RETRY_MAX_DELAY_MS
-#define RETRY_MAX_DELAY_MS      10000   /* Maximum retry delay in milliseconds */
+#ifndef JOIN_RETRY_MAX_MS
+#define JOIN_RETRY_MAX_MS       (5000U)
+#endif
+
+#ifndef UPLINK_RETRY_MIN_MS
+#define UPLINK_RETRY_MIN_MS     (2000U)
+#endif
+
+#ifndef UPLINK_RETRY_MAX_MS
+#define UPLINK_RETRY_MAX_MS     (10000U)
 #endif
 
 #ifndef MAX_RETRIES
-#define MAX_RETRIES             5       /* Maximum number of retry attempts */
+#define MAX_RETRIES             (5U)
 #endif
 
-/**
- * Calculate random backoff delay according to LoRaWAN specification
- * 
- * @return Random delay in milliseconds
- */
-static uint32_t calculate_random_backoff(void)
+/* Keep the demo responsive on the serial console while printing real delays. */
+#define DEMO_SLEEP_MS           (250U)
+
+typedef struct {
+    const char *name;
+    uint32_t min_delay_ms;
+    uint32_t max_delay_ms;
+    uint8_t success_attempt;
+} retry_scenario_t;
+
+static uint32_t random_delay_ms(uint32_t min_delay_ms, uint32_t max_delay_ms)
 {
-    uint32_t min_ms = RETRY_MIN_DELAY_MS;
-    uint32_t max_ms = RETRY_MAX_DELAY_MS;
-    uint32_t random_value = random_uint32();
-    
-    /* Map random value to range [min_ms, max_ms] */
-    uint32_t delay_ms = min_ms + (random_value % (max_ms - min_ms + 1));
-    
-    return delay_ms;
+    if (max_delay_ms <= min_delay_ms) {
+        return min_delay_ms;
+    }
+
+    return random_uint32_range(min_delay_ms, max_delay_ms + 1U);
 }
 
-/**
- * Simulate transmission with random retry logic
- */
-static void simulate_transmission_with_retries(void)
+static void print_scenario_header(const retry_scenario_t *scenario)
 {
-    printf("Starting transmission with random retry intervals\n");
-    printf("Configuration: [%u, %u] ms, max retries: %u\n",
-           RETRY_MIN_DELAY_MS, RETRY_MAX_DELAY_MS, MAX_RETRIES);
-    
-    for (uint8_t attempt = 0; attempt < MAX_RETRIES; attempt++) {
-        printf("\n[Attempt %u] Sending packet...\n", attempt + 1);
-        
-        /* Simulate packet transmission */
-        printf("[Attempt %u] Packet sent, waiting for acknowledgment\n", attempt + 1);
-        
-        /* In a real application, check for ACK here */
-        /* If ACK received, break; otherwise continue */
-        
-        if (attempt < MAX_RETRIES - 1) {
-            uint32_t backoff_ms = calculate_random_backoff();
-            printf("[Attempt %u] No ACK received. Retrying in %lu ms\n",
-                   attempt + 1, (unsigned long)backoff_ms);
-            xtimer_msleep(backoff_ms);
+    puts("");
+    printf("Scenario: %s\n", scenario->name);
+    printf("Retry window: %lu..%lu ms\n",
+           (unsigned long)scenario->min_delay_ms,
+           (unsigned long)scenario->max_delay_ms);
+    printf("Max retries: %u\n", MAX_RETRIES);
+}
+
+static void run_retry_scenario(const retry_scenario_t *scenario)
+{
+    print_scenario_header(scenario);
+
+    for (uint8_t attempt = 1U; attempt <= MAX_RETRIES; attempt++) {
+        printf("Attempt %u: transmit packet\n", attempt);
+
+        if (attempt == scenario->success_attempt) {
+            printf("Attempt %u: ACK received, retry loop stops\n", attempt);
+            return;
         }
+
+        if (attempt == MAX_RETRIES) {
+            puts("No ACK received after the final attempt");
+            break;
+        }
+
+        uint32_t delay_ms = random_delay_ms(scenario->min_delay_ms,
+                                            scenario->max_delay_ms);
+        printf("Attempt %u: no ACK, next retry after %lu ms\n",
+               attempt, (unsigned long)delay_ms);
+
+        xtimer_msleep(DEMO_SLEEP_MS);
     }
-    
-    printf("\nTransmission sequence complete\n");
+
+    puts("Result: retry budget exhausted");
 }
 
 int main(void)
 {
-    printf("=== Practice 2, Exercise 1: LoRaWAN Random Retry Intervals ===\n\n");
-    
-    /* Run simulation multiple times to demonstrate randomization */
-    for (int i = 0; i < 3; i++) {
-        printf("\n--- Transmission Sequence %d ---\n", i + 1);
-        simulate_transmission_with_retries();
-        xtimer_msleep(2000);  /* Pause between sequences */
+    uint32_t seed = xtimer_now_usec();
+    random_init(seed);
+
+    retry_scenario_t scenarios[] = {
+        {
+            .name = "JoinRequest",
+            .min_delay_ms = JOIN_RETRY_MIN_MS,
+            .max_delay_ms = JOIN_RETRY_MAX_MS,
+            .success_attempt = 3U,
+        },
+        {
+            .name = "Confirmed uplink",
+            .min_delay_ms = UPLINK_RETRY_MIN_MS,
+            .max_delay_ms = UPLINK_RETRY_MAX_MS,
+            .success_attempt = 0U,
+        },
+    };
+
+    puts("=== Practice 2, Exercise 1: LoRaWAN Random Retry Intervals ===");
+    puts("ESP32-only mode: this is a retry/backoff simulation, not a LoRa radio demo.");
+    printf("PRNG seed: %lu\n", (unsigned long)seed);
+
+    for (unsigned i = 0; i < (sizeof(scenarios) / sizeof(scenarios[0])); i++) {
+        run_retry_scenario(&scenarios[i]);
     }
-    
-    printf("\n=== Exercise Complete ===\n");
+
+    puts("");
+    puts("Exercise complete");
     return 0;
 }

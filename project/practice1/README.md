@@ -1,237 +1,216 @@
-# RIOT Project
+# Practice 1: RIOT Exercises Without Radio
 
-This directory contains several exercises and small demos built with the RIOT
-embedded operating system, now configured by default for a generic ESP32
-development board (`esp32-wroom-32` in RIOT).
+This directory contains RIOT OS exercises for the first practical assignment set.
+The assignment is about local embedded features only: GPIO, timers, interrupts,
+threads, sensors, I2C, UART, shell commands, and small drivers. Radio networking
+is not part of this practice set.
 
-Each exercise generally includes:
+The local versions in this repository are adapted for a generic ESP32 development
+board, using RIOT's `esp32-wroom-32` board by default.
 
-- a `main.c` file with the main source code
-- a `Makefile` for building with RIOT
+## Assignment Summary
 
-## Structure
+The original assignment asks for individual RIOT applications that can be shown
+working on hardware. Points after each exercise number indicate the assignment
+value. Not every exercise is required; points are cumulative across the practical
+assignment sets.
 
-The directory currently contains the following subprojects:
+Useful RIOT documentation:
 
-- `exo1`: lamp with one button and one LED
-- `exo2`: code lock with buttons
-- `exo3`: traffic light with pedestrian button
-- `exo4`: Morse code encoding and decoding with GPIO
-- `exo6`: simple benchmark based on an integer workload
-- `exo7`: memory exploration and address display
-- `exo8`: priority inversion demonstration
-- `exo8_2`: deadlock demonstration
-- `exo14`: RIOT shell with custom commands
-- `exo15`: I2C address scan
-- `exo16`: Modbus RTU slave on the console UART
-- `exo22`: exercise in progress / to be completed
+- Core and thread management: https://doc.riot-os.org/group__core.html
+- GPIO peripheral API: https://doc.riot-os.org/group__drivers__periph__gpio.html
+- `xtimer`: https://doc.riot-os.org/group__sys__xtimer.html
+- Atomic utilities: https://doc.riot-os.org/group__sys__atomic__utils.html
 
-## Build
+Important implementation note: GPIO interrupt handlers and timer callbacks run
+in interrupt context. If the main thread and an interrupt handler access the same
+variables, protect the shared state or use RIOT atomic helpers where needed.
 
-From an exercise directory:
+Common modules for the first GPIO/timer exercises:
 
-```bash
-make clean all
+```make
+USEMODULE += periph_gpio      # GPIO input/output
+USEMODULE += periph_gpio_irq  # GPIO interrupts
+USEMODULE += xtimer           # timers and delays
+USEMODULE += atomic_utils     # atomic memory access helpers
 ```
 
-Example:
+## Requested Exercises
 
-```bash
-cd project/exo14
-make clean all
+- `exo1` (1 pt): lamp with switch. Implement button polling, then GPIO interrupt handling with debounce, then blinking at selectable frequency using long press.
+- `exo2` (1 pt): code lock with several buttons. Correct button sequence toggles a LED; wrong attempts and state changes are printed on the console.
+- `exo3` (1 pt): traffic light with a pedestrian button. Switch multiple LEDs according to a schedule; button presses may reschedule the next green phase when it is too far away.
+- `exo3` LCD extension (1 pt): add a character LCD and display the remaining time before the next switch.
+- `exo4` (1 pt + 2 pt): Morse code encoding and decoding using GPIO.
+- `exo5` (2 pt): electronic gear simulation with an encoder and stepper motor driver, including rotation direction.
+- `exo6` (2 pt): benchmark the MCU with CoreMark or Dhrystone and compare the result with a PC.
+- `exo7` (1 pt): print addresses of globals, locals, static variables, constants, interrupt data, functions, and thread variables to study memory layout.
+- `exo8` (1 pt): demonstrate priority inversion and deadlock; enable mutex priority inheritance and discuss its limits.
+- `exo9` (1 pt): connect BME280 and DHT11 sensors and compare their readings.
+- `exo10` (2 pt): weather station with LCD using BME280 or DHT11 readings.
+- `exo11` (2 pt): shock or movement detector using an accelerometer.
+- `exo12` (3 pt): rotation counter using an accelerometer by detecting direction-vector flips.
+- `exo13` (2 pt): proximity-sensor timer that activates an actuator for a fixed time.
+- `exo14` (2 pt): enable RIOT shell and add custom commands, for example sensor commands.
+- `exo15` (2 pt): scan and print all 7-bit I2C device addresses.
+- `exo16` (2 pt): Modbus RTU over the standard console UART; Termite is used for testing.
+- `exo17` (1 pt): connect a 1-Wire device using RIOT's `drivers/onewire`.
+- `exo18` (2 pt): night light using PWM brightness control based on a light sensor.
+- `exo19` (2 pt): stepper-motor indicator controlled by an ADC signal level.
+- `exo20` (2 pt): code lock with contactless card reader and per-card passwords.
+- `exo21` (2-4 pt): add a driver for an external device that RIOT does not already support.
+- `exo22` (3 pt + 2 pt): bit-banged single-wire bus between devices; optional `netif` interface.
+- `exo23` (2 pt + 10 pt): improve STM32L1 low-power sleep handling and optionally upstream the change.
+
+## Implemented In This Repository
+
+The directory currently contains these subprojects:
+
+- `exo1`: lamp with one button and one LED.
+- `exo2`: code lock with four buttons and one status LED.
+- `exo3`: ESP32 traffic light with pedestrian button.
+- `exo4`: Morse code encoding and decoding with GPIO.
+- `exo6`: simple benchmark based on an integer workload.
+- `exo7`: memory exploration and address display.
+- `exo8`: priority inversion demonstration.
+- `exo8_2`: deadlock demonstration.
+- `exo12`: accelerometer-based rotation counter.
+- `exo14`: RIOT shell with custom commands.
+- `exo15`: I2C address scan.
+- `exo16`: Modbus RTU slave on the console UART.
+- `exo22`: exercise in progress / to be completed.
+
+## ESP32 Target
+
+The `Makefile` files in this practice directory are intended to use:
+
+```make
+BOARD ?= esp32-wroom-32
 ```
 
-## Flashing and target board
-
-The `Makefile` files are configured by default for:
-
-- `BOARD ?= esp32-wroom-32`
-
-The following command is used to flash and open a serial terminal on the board:
-
-```bash
-make BOARD=esp32-wroom-32 flash term
-```
-
-If you use another RIOT ESP32 board definition, you can still override it from
-the command line, for example:
+You can override the board from the command line if your ESP32 variant has a
+different RIOT board definition:
 
 ```bash
 make BOARD=esp32s3-devkit flash term
 ```
 
-## Commands Used To Make ESP32 Work
+## Build
 
-Below is the full command sequence that was used in practice to make the ESP32
-toolchain and flashing work under WSL with a CH340 USB serial adapter.
-
-### 1. Install prerequisites and the ESP32 toolchain
-
-Run from the RIOT root:
+From the RIOT root, build one exercise with:
 
 ```bash
-cd /mnt/e/RIOT
-sudo apt update
-sudo apt install -y curl python3 python3-serial telnet
-./dist/tools/esptools/install.sh esp32
+make -C project/practice1/exo3 clean all
 ```
 
-If the toolchain was installed under `/root/.espressif`, export that path:
+From inside an exercise directory, use:
+
+```bash
+make clean all
+```
+
+If the ESP32 toolchain is installed under `/root/.espressif`, load it before
+building:
 
 ```bash
 export IDF_TOOLS_PATH=/root/.espressif
 . ./dist/tools/esptools/export.sh esp32
 ```
 
-Optional checks:
+Useful checks:
 
 ```bash
 which xtensa-esp32-elf-gcc
 xtensa-esp32-elf-gcc --version
 ```
 
-### 2. Attach the ESP32 USB device to WSL from Windows
+## Flashing
 
-In a Windows terminal:
+If the ESP32 appears as `/dev/ttyUSB0`, flash with:
+
+```bash
+make -C project/practice1/exo3 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash
+```
+
+To flash and open the RIOT serial terminal:
+
+```bash
+make -C project/practice1/exo3 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+## WSL And USB Setup
+
+The following commands were used to make an ESP32 with a CH340 USB serial
+adapter work under WSL.
+
+Install prerequisites and the ESP32 toolchain from the RIOT root:
+
+```bash
+sudo apt update
+sudo apt install -y curl python3 python3-serial telnet
+./dist/tools/esptools/install.sh esp32
+```
+
+Attach the USB device to WSL from a Windows terminal:
 
 ```powershell
 usbipd list
-```
-
-Then attach the correct BUSID to WSL if needed:
-
-```powershell
 usbipd bind --busid 1-1
 usbipd attach --wsl --busid 1-1
 ```
 
-### 3. Check that Linux sees the USB adapter
-
-In WSL:
+Check the device from WSL:
 
 ```bash
 lsusb
-```
-
-For the board used here, the USB/serial converter was:
-
-- `1a86:7523` (`CH340/CH341`)
-
-### 4. Load the USB serial driver in WSL
-
-If `/dev/ttyUSB0` does not appear automatically, load the kernel module:
-
-```bash
-dmesg | tail -50
-modprobe ch341
-dmesg | tail -50
 ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
 ```
 
-If needed, you can also load the generic USB serial layer first:
+For the board used here, the USB/serial converter was `1a86:7523` (`CH340/CH341`).
+If `/dev/ttyUSB0` does not appear automatically, load the serial driver:
 
 ```bash
-modprobe usbserial
-modprobe ch341
-```
-
-### 5. Build an exercise
-
-Example with `exo2`:
-
-```bash
-cd /mnt/e/RIOT/project/exo2
-make BOARD=esp32-wroom-32
-```
-
-### 6. Flash the board
-
-If the port is `/dev/ttyUSB0`:
-
-```bash
-make BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash
-```
-
-To flash and open the serial terminal in one command:
-
-```bash
-make BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
-```
-
-### 7. Useful troubleshooting commands
-
-```bash
+sudo modprobe usbserial
+sudo modprobe ch341
 ls /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+```
+
+Useful troubleshooting commands:
+
+```bash
 dmesg | grep -iE 'ch34|ch341|ttyUSB|usbserial' | tail -20
 uname -r
 ```
 
-## Wiring Notes For GPIO Exercises
+## Wiring Notes
 
-Some exercises use external LEDs or buttons. For the ESP32 versions, the pins
-are now defined directly in the source files and can be changed easily if your
-wiring differs.
+The ESP32 versions define pins directly in each source file so they can be
+changed easily if your wiring differs.
 
-- `exo1`: integrated button via `BTN0_PIN` and integrated LED on `GPIO2`
-- `exo2`: default buttons on GPIO18, GPIO19, GPIO21, GPIO22 and status LED on
-  GPIO2
-- `exo3`: default traffic-light LEDs on GPIO16, GPIO17, GPIO18 and pedestrian
-  button on GPIO19
-- `exo4`: integrated button via `BTN0_PIN` and integrated LED on `GPIO2`
-- `exo16`: integrated LED on `GPIO2`, console UART used for Modbus RTU
+- `exo1`: integrated button via `BTN0_PIN`; integrated LED on `GPIO2`.
+- `exo2`: buttons on `GPIO18`, `GPIO19`, `GPIO21`, `GPIO22`; status LED on `GPIO2`.
+- `exo3`: red LED on `GPIO16`, yellow LED on `GPIO17`, green LED on `GPIO18`, pedestrian button on `GPIO19`.
+- `exo4`: integrated button via `BTN0_PIN`; integrated LED on `GPIO2`.
+- `exo16`: integrated LED on `GPIO2`; console UART used for Modbus RTU.
 
-## Exercise 1
+## Exercise Notes
 
-`exo1` implements a lamp/switch exercise for ESP32 with the integrated button
-and LED:
+`exo1` implements the lamp/switch task with interrupt handling, debounce,
+periodic polling in the main loop, short press to toggle blinking, and long
+press to change blink frequency.
 
-- short press: enable or stop LED blinking
-- long press: change the blinking frequency
-- debounce: handled by disabling the GPIO interrupt, then validating the button
-  state in the main loop
-- periodic polling: the main loop checks button release, long-press duration,
-  and LED blink timing
+`exo3` implements the requested traffic-light exercise for ESP32. The current
+version keeps a pedestrian request if the button is pressed during the green or
+yellow phase, then handles it during the red phase.
 
-## Exercise 4
+`exo4` implements Morse code with GPIO. The integrated LED blinks `RIOT ESP32`,
+and the integrated BOOT button can be used to enter Morse manually.
 
-`exo4` implements Morse code with the GPIO elements directly available on the
-ESP32 board:
-
-- encoding: the integrated LED blinks the message `RIOT ESP32` in Morse code
-- decoding: the integrated BOOT button is used to enter Morse code manually
-- short press: dot
-- long press: dash
-- end of letter: detected after a short silence, then decoded and printed
-
-## Exercise 16
-
-`exo16` implements a simple Modbus RTU slave over the standard console UART:
-
-- UART: `UART_DEV(0)` at `115200` baud
-- slave ID: `1`
-- function codes: `0x03`, `0x06`, `0x10`
-- simulated sensor registers:
-- register `0`: temperature in tenths of a degree
-- register `1`: humidity in tenths of a percent
-- register `2`: pressure in tenths of hPa
-- register `3`: LED state (`0` = off, non-zero = on)
-
-This exercise is intended to be tested from a serial Modbus RTU master such as
-Termite on the host machine.
-
-## Purpose
-
-The goal of this directory is to gather RIOT exercises around several topics:
-
-- GPIO and interrupts
-- timers and time measurement
-- memory
-- scheduling and synchronization
-- embedded shell
-- I2C bus
+`exo16` implements a simple Modbus RTU slave over the standard console UART at
+`115200` baud, with slave ID `1` and function codes `0x03`, `0x06`, and `0x10`.
+It is intended to be tested from a serial Modbus RTU master such as Termite.
 
 ## Notes
 
-- Some exercises are educational demonstrations rather than final applications.
-- Some subdirectories may still be in the process of cleanup or build
-  validation.
+Some exercises are educational demonstrations rather than final applications.
+Some subdirectories may still be in cleanup or build validation.

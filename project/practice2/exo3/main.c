@@ -1,40 +1,60 @@
-// exo3_annonceur/main.c
+#include <stdint.h>
 #include <stdio.h>
-#include "board.h"
+#include <string.h>
+
 #include "xtimer.h"
-#include "skald.h"
-#include "skald_eddystone.h"
 
-#define SKALD_INTERVAL_US   (1000U * 1000U) // Annonce toutes les 1s
+#define EDDYSTONE_URL_SCHEME_HTTPS     (0x03U)
+#define EDDYSTONE_FRAME_TYPE_URL       (0x10U)
+#define TX_POWER                       (0x00U)
+#define ADVERTISED_URL                 "riot-os.org"
+#define ADV_INTERVAL_MS                (1000U)
 
-static skald_ctx_t skald_ctx;
-static skald_eddystone_uri_t eddystone_data = {
-    .prefix = SKALD_EDDYSTONE_URL_PREFIX_HTTPS,
-    .url = "riot-os.org" // ou "RIOT BLE Beacon"
-};
+static size_t build_eddystone_url_payload(uint8_t *payload, size_t payload_len,
+                                          const char *url)
+{
+    size_t url_len = strlen(url);
 
-static uint8_t tx_buf[SKALD_EDDYSTONE_CTX_DATA_LEN_MAX];
+    if (payload_len < (3U + url_len)) {
+        return 0;
+    }
+
+    payload[0] = EDDYSTONE_FRAME_TYPE_URL;
+    payload[1] = TX_POWER;
+    payload[2] = EDDYSTONE_URL_SCHEME_HTTPS;
+    memcpy(&payload[3], url, url_len);
+
+    return 3U + url_len;
+}
+
+static void print_payload(const uint8_t *payload, size_t len)
+{
+    for (size_t i = 0; i < len; i++) {
+        printf("%02X ", payload[i]);
+    }
+    puts("");
+}
 
 int main(void)
 {
-    puts("=== Exercice 3: BLE Beacon avec Skald (Annonceur) ===");
+    uint8_t payload[32];
+    size_t payload_len = build_eddystone_url_payload(payload, sizeof(payload),
+                                                     ADVERTISED_URL);
 
-    // 1. Initialisation radio
-    skald_init();
+    puts("=== Practice 2, Exercise 3: BLE Beacon Payload Lab ===");
+    puts("ESP32 mode: preparing the Eddystone URL payload only.");
+    puts("Real Skald advertising still needs compatible BLE radio support.");
 
-    // 2. Préparation du contexte Skald
-    skald_ctx_init(&skald_ctx);
-    skald_eddystone_uri_prep(&eddystone_data, tx_buf);
-    skald_ctx_set_advdata(&skald_ctx, tx_buf, SKALD_EDDYSTONE_CTX_DATA_LEN_MAX);
-    // Active le "Tx Power" pour le calcul de distance
-    skald_eddystone_set_tx_power(&skald_ctx, 0);
-
-    // 3. Démarrage de l'annonce
-    skald_adv_start(&skald_ctx);
-    puts("✅ Annonce BLE démarrée, vérifiez avec un autre appareil !");
+    printf("URL: https://%s", ADVERTISED_URL);
+    puts("");
+    printf("Payload length: %u bytes", (unsigned)payload_len);
+    puts("");
+    printf("Payload bytes: ");
+    print_payload(payload, payload_len);
 
     while (1) {
-        xtimer_usleep(1000000);
+        puts("Simulated beacon tick");
+        xtimer_msleep(ADV_INTERVAL_MS);
     }
 
     return 0;
