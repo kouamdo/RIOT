@@ -1,101 +1,232 @@
-# Practice 2: Wireless Networks
+# Practice 2: Wireless Networks On ESP32
 
-This directory follows the second practical assignment set. The original topic is
-wireless networking with RIOT: LoRaWAN, BLE, NimBLE, 6LoWPAN over BLE, CoAP, and
-security analysis.
+This directory follows the second practical assignment set. The original topic is wireless networking with RIOT: LoRaWAN, BLE/NimBLE, 6LoWPAN over BLE, CoAP, and security analysis.
 
-The assignment was designed mainly around nRF52-DK boards and LoRaWAN hardware.
-For this repository, the current target board is the same ESP32 used in
-`project/practice1`:
+The original assignment expects radio-capable hardware such as nRF52-DK boards, LoRaWAN credentials, multiple boards, and sometimes extra devices such as LCDs or sensors. For now, this repository targets the same board as practice1:
 
 ```make
 BOARD ?= esp32-wroom-32
 ```
 
-For now, exercises that can be prepared or demonstrated with only the ESP32 are
-implemented as local simulations, packet builders, protocol models, or security
-analysis programs. Exercises that require real BLE/NimBLE, nRF52 radio, multiple
-boards, LoRaWAN credentials, or extra displays/sensors are documented as hardware
-blocked until the needed equipment is available.
+Because only one ESP32 board is currently available, the solved exercises are implemented as simulations, packet builders, protocol models, and security analysis programs. They can be run on the ESP32 now. The real radio demonstrations can be added later when the required hardware is available.
 
-## Requested Exercises
+## ESP32 Environment
 
-- `exo1` (1 pt): add random retry intervals for LoRaWAN transmissions or JoinRequest attempts.
-- `exo2` (2 pt): construct a packet that breaks old RIOT versions, based on commit `fffe8bb7328a61ab9756b28089c4f987a7f46f53`.
-- `exo3` (1 pt + 2 pt): broadcast useful BLE beacons with Skald on nRF52-DK; scan with NimBLE and estimate the nearest beacon by RSSI.
-- `exo4` (2 pt): implement the BLE Cycling Speed and Cadence profile using NimBLE and GPIO pulse counting.
-- `exo5` (2 pt): extend `examples/nimble_heart_rate_sensor` using real ECG data from `examples-miem/dsp/ecg.h`.
-- `exo6` (2 pt): connect two or three nRF52-DK boards using 6LoWPAN over BLE and exchange CoAP messages.
-- `exo7` (2+ pt): add radio networking to a device from practice 1 or 2, with a meaningful use case.
-- `exo8` (3 pt): analyze whether a LoRaWAN smart lock using a fixed `open` payload is vulnerable to replay/jamming attacks, and demonstrate or explain the result.
-- `exo9` (3 pt + 3 pt): LoRaWAN Class C voting pager with LCD and four buttons; optional He-Su secret voting protocol with NaCl.
-- `exo10` (3 pt): smart home system with 6LoWPAN and CoAP, including lights, switches, and sensors.
-- `exo11` (2 pt + 10 pt): add RU864 frequency-plan support to mbed LoRaWAN and optionally upstream it.
-
-## Current ESP32 Scope
-
-These folders are useful with only the ESP32 board available now:
-
-- `exo1`: random retry/backoff simulator for LoRaWAN-style retries.
-- `exo2`: packet-construction lab for the historical RIOT crash exercise; the exact commit is not present in this clone, so the code documents that limitation and builds a reproducible oversized packet model.
-- `exo3`: Eddystone/Skald payload preparation lab; real BLE advertising still requires compatible BLE radio support.
-- `exo4`: Cycling Speed and Cadence payload encoder with simulated GPIO pulses; real BLE GATT notifications require NimBLE-capable hardware/support.
-- `exo5`: ECG/heart-rate processing simulator; real BLE heart-rate service can be added later.
-- `exo6`: local CoAP-over-6LoWPAN scenario model; real network exchange requires multiple BLE-capable boards.
-- `exo7`: smart traffic-light network-integration scenario, modelled locally.
-- `exo8`: smart-lock replay and jamming security analysis, modelled locally.
-
-Hardware-blocked for now:
-
-- `exo9`: requires LoRaWAN Class C setup, LCD, and buttons.
-- `exo10`: requires several networked devices and sensors/switches.
-- `exo11`: concerns mbed LoRaWAN RU864 support, not the ESP32 RIOT target.
-
-## Build Setup For ESP32
-
-Load the ESP32 toolchain from the RIOT root before building:
+From the RIOT root, load the ESP32 toolchain before building or flashing:
 
 ```bash
 export IDF_TOOLS_PATH=/root/.espressif
 . ./dist/tools/esptools/export.sh esp32
 ```
 
-Build one exercise from the RIOT root:
+Check that the compiler is available:
 
 ```bash
-make -C project/practice2/exo1 clean all
+which xtensa-esp32-elf-gcc
+xtensa-esp32-elf-gcc --version
 ```
 
-Build from inside an exercise directory:
+If `which xtensa-esp32-elf-gcc` does not print a path under `/root/.espressif`, the ESP32 toolchain is not loaded in the current terminal.
+
+## Common Commands
+
+Build one exercise:
 
 ```bash
-make clean all
+make -C project/practice2/exo1 BOARD=esp32-wroom-32
 ```
 
-Flash to an ESP32 connected as `/dev/ttyUSB0`:
+Clean and rebuild one exercise:
+
+```bash
+make -C project/practice2/exo1 BOARD=esp32-wroom-32 clean all
+```
+
+Flash and open the terminal, assuming the ESP32 is on `/dev/ttyUSB0`:
 
 ```bash
 make -C project/practice2/exo1 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
 ```
 
-## Exercise Status
+Use another exercise by replacing `exo1` with `exo2`, `exo3`, etc.
 
-| Exercise | Current state | ESP32-only status |
-| --- | --- | --- |
-| `exo1` | Implemented as retry/backoff simulation | Buildable now |
-| `exo2` | Added packet-construction lab | Buildable now |
-| `exo3` | Corrected from nRF52 Skald build to ESP32 payload lab | Buildable now, radio demo blocked |
-| `exo4` | Corrected from NimBLE-only build to ESP32 CSC encoder | Buildable now, BLE GATT blocked |
-| `exo5` | Added ECG/heart-rate simulator | Buildable now |
-| `exo6` | Added local CoAP/6LoWPAN scenario model | Buildable now, multi-board demo blocked |
-| `exo7` | Corrected Makefile for ESP32 simulation | Buildable now, real radio integration blocked |
-| `exo8` | Corrected Makefile for ESP32 security simulation | Buildable now |
-| `exo9` | Not started | Hardware blocked |
-| `exo10` | Not started | Hardware blocked |
-| `exo11` | Not started | Not relevant to ESP32 RIOT build |
+## Solved Exercises
+
+### `exo1`: LoRaWAN Random Retry Intervals
+
+Status: solved as an ESP32 retry/backoff simulation.
+
+What it demonstrates:
+
+- random retry intervals for a simulated `JoinRequest`
+- random retry intervals for a simulated confirmed uplink
+- bounded retry windows using RIOT's random API
+- serial output showing each attempt and selected delay
+
+Commands:
+
+```bash
+make -C project/practice2/exo1 BOARD=esp32-wroom-32
+make -C project/practice2/exo1 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo2`: Packet For A Legacy RIOT Crash
+
+Status: solved as an ESP32 packet-construction and parser-safety model.
+
+The assignment references commit `fffe8bb7328a61ab9756b28089c4f987a7f46f53`, but that commit object is not present in this local clone. The current program models the likely class of bug safely: an old parser trusting a packet length field before copying into a fixed-size buffer.
+
+What it demonstrates:
+
+- a safe control packet
+- a malicious oversized packet
+- a vulnerable parser model that would overflow
+- a fixed parser model that rejects the packet
+
+Commands:
+
+```bash
+make -C project/practice2/exo2 BOARD=esp32-wroom-32
+make -C project/practice2/exo2 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo3`: BLE Beacon Payload Lab
+
+Status: solved as an ESP32 Eddystone payload preparation lab.
+
+What it demonstrates:
+
+- construction of an Eddystone URL payload
+- payload byte dump on the serial console
+- simulated beacon ticks
+
+Hardware note: real Skald BLE advertising is blocked until a compatible BLE radio target is available, for example nRF52-DK.
+
+Commands:
+
+```bash
+make -C project/practice2/exo3 BOARD=esp32-wroom-32
+make -C project/practice2/exo3 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo4`: BLE Cycling Speed And Cadence Preparation
+
+Status: solved as an ESP32 pulse and payload encoder.
+
+What it demonstrates:
+
+- simulated GPIO pulse stream
+- cadence calculation in RPM
+- Cycling Speed and Cadence measurement encoding
+- payload bytes that can later be sent through a BLE GATT characteristic
+
+Hardware note: real BLE GATT notifications require NimBLE-capable radio support.
+
+Commands:
+
+```bash
+make -C project/practice2/exo4 BOARD=esp32-wroom-32
+make -C project/practice2/exo4 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo5`: ECG Heart-Rate Processing
+
+Status: solved as an ESP32 ECG processing simulation.
+
+What it demonstrates:
+
+- processing a built-in ECG-like sample array
+- R-peak detection
+- BPM estimation
+- logic that can later feed a BLE Heart Rate Service characteristic
+
+Hardware/data note: replace the built-in sample array with `examples-miem/dsp/ecg.h` data when that file is available.
+
+Commands:
+
+```bash
+make -C project/practice2/exo5 BOARD=esp32-wroom-32
+make -C project/practice2/exo5 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo6`: 6LoWPAN/CoAP Scenario Model
+
+Status: solved as a local CoAP exchange model.
+
+What it demonstrates:
+
+- a simulated CoAP discovery request
+- a simulated state read
+- a simulated state update
+- the message flow expected later between 6LoWPAN nodes
+
+Hardware note: real 6LoWPAN over BLE requires two or three compatible BLE boards.
+
+Commands:
+
+```bash
+make -C project/practice2/exo6 BOARD=esp32-wroom-32
+make -C project/practice2/exo6 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo7`: Smart Traffic-Light Network Integration
+
+Status: solved as an ESP32 network-integration model.
+
+What it demonstrates:
+
+- traffic-light state model
+- simulated network commands from a traffic control center
+- status report generation
+- timing update commands
+- design justification for LoRaWAN or 6LoWPAN integration
+
+Hardware note: real radio integration is blocked until LoRaWAN or BLE networking hardware is available.
+
+Commands:
+
+```bash
+make -C project/practice2/exo7 BOARD=esp32-wroom-32
+make -C project/practice2/exo7 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+### `exo8`: LoRaWAN Smart-Lock Security Analysis
+
+Status: solved as an ESP32 security simulation.
+
+What it demonstrates:
+
+- a vulnerable fixed-payload `open` command
+- replay attack behavior
+- mitigation using a monotonic counter
+- jamming analysis and fail-safe design notes
+
+Commands:
+
+```bash
+make -C project/practice2/exo8 BOARD=esp32-wroom-32
+make -C project/practice2/exo8 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
+```
+
+## Build All Solved ESP32 Exercises
+
+From the RIOT root:
+
+```bash
+export IDF_TOOLS_PATH=/root/.espressif
+. ./dist/tools/esptools/export.sh esp32
+
+for exo in exo1 exo2 exo3 exo4 exo5 exo6 exo7 exo8; do
+    make -C project/practice2/$exo BOARD=esp32-wroom-32 || exit 1
+done
+```
+
+## Exercises Blocked For Now
+
+- `exo9`: requires LoRaWAN Class C support, LCD, and four buttons.
+- `exo10`: requires several networked devices, sensors, and switches.
+- `exo11`: concerns mbed LoRaWAN RU864 support, not the current RIOT ESP32 setup.
 
 ## Notes
 
-The current ESP32 programs are preparation and validation steps. They make the
-protocol logic, packet formats, state machines, and security reasoning runnable
-now, while keeping the real wireless work clearly separated for later hardware.
+The current ESP32 programs are not final radio demos. They are preparation and validation steps that make the protocol logic, packet formats, state machines, and security reasoning runnable now on the hardware currently available.
