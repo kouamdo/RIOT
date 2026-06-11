@@ -70,6 +70,50 @@ make -C project/practice2/exo1 BOARD=esp32-wroom-32
 make -C project/practice2/exo1 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
 ```
 
+### `exo1_lorawan`: ESP32 + UMDK RF 107 LoRaWAN Test
+
+Status: added as a real-hardware variant for an ESP32 connected to a UMDK RF 107 LoRa module.
+
+What it demonstrates:
+
+- OTAA join using RIOT's Semtech LoRaMAC package
+- random retry intervals after failed `JoinRequest`
+- confirmed uplink retry with random backoff
+- configurable SX127x wiring for the external LoRa module
+
+Default wiring:
+
+```text
+ESP32 GPIO18 -> LoRa SCK
+ESP32 GPIO19 -> LoRa MISO
+ESP32 GPIO23 -> LoRa MOSI
+ESP32 GPIO5  -> LoRa NSS/CS
+ESP32 GPIO14 -> LoRa RESET
+ESP32 GPIO26 -> LoRa DIO0
+ESP32 GPIO33 -> LoRa DIO1
+ESP32 GPIO32 -> LoRa DIO2
+3V3          -> LoRa VCC
+GND          -> LoRa GND
+```
+
+The UMDK RF 107 is treated as an SX1276-compatible LoRa radio. If your physical pinout differs from the table above, edit `exo1_lorawan/include/sx127x_params.h`.
+
+Build:
+
+```bash
+make -C project/practice2/exo1_lorawan BOARD=esp32-wroom-32
+```
+
+Flash with OTAA credentials:
+
+```bash
+make -C project/practice2/exo1_lorawan BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 \
+    DEVEUI=0011223344556677 \
+    APPEUI=0102030405060708 \
+    APPKEY=00112233445566778899AABBCCDDEEFF \
+    flash term
+```
+
 ### `exo2`: Packet For A Legacy RIOT Crash
 
 Status: solved as an ESP32 packet-construction and parser-safety model.
