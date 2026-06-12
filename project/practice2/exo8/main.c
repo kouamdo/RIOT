@@ -1,178 +1,126 @@
 /*
- * Practice 2, Exercise 8: LoRaWAN smart lock security analysis.
+ * Practice 2 - Exercise 8
+ * Bluetooth smart lock security simulation.
  *
- * ESP32-only mode: simulate packets and protocol checks locally. The point is
- * to show why a lock that opens on a fixed payload is vulnerable to replay and
- * why a monotonic counter or cryptographic authentication is needed.
+ * A fixed Bluetooth command like "open" is easy to replay. A small counter is
+ * added to show a simple protection idea.
  */
 
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
-#include "xtimer.h"
-
-#define UNLOCK_COMMAND_LEN      (4U)
-#define SECURE_PACKET_LEN       (UNLOCK_COMMAND_LEN + 2U)
+#define CMD_LEN             (4U)
+#define SECURE_CMD_LEN      (6U)
 
 typedef enum {
-    LOCK_LOCKED,
-    LOCK_UNLOCKED,
-    LOCK_ALARM,
+    LOCKED,
+    UNLOCKED,
+    ALARM,
 } lock_state_t;
 
 typedef struct {
-    uint8_t payload[16];
+    uint8_t data[8];
     uint8_t len;
     int8_t rssi;
-    uint32_t received_ms;
-} radio_packet_t;
+} bt_packet_t;
 
-typedef struct {
-    lock_state_t state;
-    uint16_t expected_counter;
-    uint16_t replay_detections;
-} smart_lock_t;
+static lock_state_t state = LOCKED;
+static uint16_t next_counter = 1;
 
-static const uint8_t unlock_command[UNLOCK_COMMAND_LEN] = { 'o', 'p', 'e', 'n' };
-
-static smart_lock_t lock = {
-    .state = LOCK_LOCKED,
-    .expected_counter = 1U,
-};
-
-static const char *lock_state_name(lock_state_t state)
+static const char *state_name(void)
 {
-    switch (state) {
-    case LOCK_LOCKED:
+    if (state == LOCKED) {
         return "locked";
-    case LOCK_UNLOCKED:
-        return "unlocked";
-    case LOCK_ALARM:
-        return "alarm";
-    default:
-        return "unknown";
     }
+    if (state == UNLOCKED) {
+        return "unlocked";
+    }
+    return "alarm";
 }
 
-static bool payload_is_open_command(const radio_packet_t *packet)
+static int starts_with_open(const bt_packet_t *pkt)
 {
-    return packet->len >= UNLOCK_COMMAND_LEN &&
-           memcmp(packet->payload, unlock_command, UNLOCK_COMMAND_LEN) == 0;
+    return (pkt->len >= CMD_LEN) && (memcmp(pkt->data, "open", CMD_LEN) == 0);
 }
 
-static void vulnerable_handler(const radio_packet_t *packet)
+static void weak_lock_code(const bt_packet_t *pkt)
 {
-    printf("vulnerable handler: len=%u rssi=%d\n", packet->len, packet->rssi);
+    printf("weak check, rssi=%d\n", pkt->rssi);
 
-    if (packet->len == UNLOCK_COMMAND_LEN && payload_is_open_command(packet)) {
-        lock.state = LOCK_UNLOCKED;
-        puts("  accepted fixed payload 'open' -> lock opens");
+    if ((pkt->len == CMD_LEN) && starts_with_open(pkt)) {
+        state = UNLOCKED;
+        puts("accepted 'open' -> door opens");
     }
     else {
-        puts("  rejected packet");
+        puts("command rejected");
     }
 }
 
-static void secure_counter_handler(const radio_packet_t *packet)
+static void better_lock_code(const bt_packet_t *pkt)
 {
-    printf("counter handler: len=%u rssi=%d\n", packet->len, packet->rssi);
+    printf("counter check, rssi=%d\n", pkt->rssi);
 
-    if (packet->len != SECURE_PACKET_LEN || !payload_is_open_command(packet)) {
-        puts("  rejected malformed command");
+    if ((pkt->len != SECURE_CMD_LEN) || !starts_with_open(pkt)) {
+        puts("bad command");
         return;
     }
 
-    uint16_t counter = ((uint16_t)packet->payload[4] << 8) | packet->payload[5];
-    printf("  counter=%u expected=%u\n", counter, lock.expected_counter);
+    uint16_t counter = ((uint16_t)pkt->data[4] << 8) | pkt->data[5];
+    printf("counter=%u expected=%u\n", counter, next_counter);
 
-    if (counter == lock.expected_counter) {
-        lock.expected_counter++;
-        lock.state = LOCK_UNLOCKED;
-        puts("  accepted fresh command -> lock opens");
-    }
-    else if (counter < lock.expected_counter) {
-        lock.replay_detections++;
-        lock.state = LOCK_ALARM;
-        puts("  rejected old counter -> replay detected");
+    if (counter == next_counter) {
+        next_counter++;
+        state = UNLOCKED;
+        puts("fresh command accepted");
     }
     else {
-        puts("  rejected future counter -> sequence gap");
+        state = ALARM;
+        puts("old command detected: possible replay");
     }
-}
-
-static radio_packet_t fixed_open_packet(void)
-{
-    return (radio_packet_t) {
-        .payload = { 'o', 'p', 'e', 'n' },
-        .len = UNLOCK_COMMAND_LEN,
-        .rssi = -92,
-        .received_ms = xtimer_now_usec() / 1000U,
-    };
-}
-
-static radio_packet_t counted_open_packet(uint16_t counter)
-{
-    return (radio_packet_t) {
-        .payload = { 'o', 'p', 'e', 'n', (uint8_t)(counter >> 8), (uint8_t)counter },
-        .len = SECURE_PACKET_LEN,
-        .rssi = -88,
-        .received_ms = xtimer_now_usec() / 1000U,
-    };
-}
-
-static void demonstrate_replay(void)
-{
-    radio_packet_t packet = fixed_open_packet();
-
-    puts("Replay demonstration with fixed payload:");
-    vulnerable_handler(&packet);
-    printf("  state after first packet: %s\n", lock_state_name(lock.state));
-
-    lock.state = LOCK_LOCKED;
-    vulnerable_handler(&packet);
-    printf("  state after replayed packet: %s\n", lock_state_name(lock.state));
-    puts("  conclusion: capture-and-replay works against a fixed command\n");
-}
-
-static void demonstrate_counter_mitigation(void)
-{
-    radio_packet_t fresh = counted_open_packet(1U);
-    radio_packet_t replay = counted_open_packet(1U);
-
-    lock.state = LOCK_LOCKED;
-    lock.expected_counter = 1U;
-    lock.replay_detections = 0U;
-
-    puts("Counter mitigation demonstration:");
-    secure_counter_handler(&fresh);
-    printf("  state after fresh packet: %s\n", lock_state_name(lock.state));
-
-    lock.state = LOCK_LOCKED;
-    secure_counter_handler(&replay);
-    printf("  state after replayed packet: %s\n", lock_state_name(lock.state));
-    printf("  replay detections: %u\n\n", lock.replay_detections);
-}
-
-static void discuss_jamming(void)
-{
-    puts("Jamming analysis:");
-    puts("  - LoRa modulation helps against noise but does not make jamming impossible");
-    puts("  - a smart lock must fail safe when communication is unavailable");
-    puts("  - local access should not depend only on the radio path");
-    puts("  - repeated radio failures should be logged and reported later");
 }
 
 int main(void)
 {
-    puts("=== Practice 2, Exercise 8: LoRaWAN Smart Lock Security Simulation ===");
-    puts("ESP32-only mode: local replay and mitigation model.\n");
+    bt_packet_t open_packet = {
+        .data = { 'o', 'p', 'e', 'n' },
+        .len = CMD_LEN,
+        .rssi = -45,
+    };
 
-    demonstrate_replay();
-    demonstrate_counter_mitigation();
-    discuss_jamming();
+    bt_packet_t secure_packet = {
+        .data = { 'o', 'p', 'e', 'n', 0, 1 },
+        .len = SECURE_CMD_LEN,
+        .rssi = -43,
+    };
 
-    puts("\nExercise complete");
+    puts("Practice 2 - Exercise 8");
+    puts("Bluetooth smart lock security\n");
+
+    puts("1) Weak version with fixed command");
+    weak_lock_code(&open_packet);
+    printf("state: %s\n", state_name());
+
+    state = LOCKED;
+    puts("replay the same packet");
+    weak_lock_code(&open_packet);
+    printf("state: %s\n\n", state_name());
+
+    puts("2) Better version with a counter");
+    state = LOCKED;
+    next_counter = 1;
+    better_lock_code(&secure_packet);
+    printf("state: %s\n", state_name());
+
+    state = LOCKED;
+    puts("replay the same secure packet");
+    better_lock_code(&secure_packet);
+    printf("state: %s\n\n", state_name());
+
+    puts("Conclusion:");
+    puts("- Bluetooth commands also need freshness checks");
+    puts("- a fixed payload is not enough for a smart lock");
+    puts("- the lock should stay safe if radio commands look suspicious");
+
     return 0;
 }

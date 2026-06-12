@@ -1,14 +1,14 @@
 # Practice 2: Wireless Networks On ESP32
 
-This directory follows the second practical assignment set. The original topic is wireless networking with RIOT: LoRaWAN, BLE/NimBLE, 6LoWPAN over BLE, CoAP, and security analysis.
+This directory follows the second practical assignment set. The topic is wireless networking with RIOT: Bluetooth/BLE, 6LoWPAN over BLE, CoAP, and security analysis.
 
-The original assignment expects radio-capable hardware such as nRF52-DK boards, LoRaWAN credentials, multiple boards, and sometimes extra devices such as LCDs or sensors. For now, this repository targets the same board as practice1:
+The teacher allowed Bluetooth when the long range radio setup is difficult on ESP32. For now, this repository targets the same board as practice1:
 
 ```make
 BOARD ?= esp32-wroom-32
 ```
 
-Because only one ESP32 board is currently available, the solved exercises are implemented as simulations, packet builders, protocol models, and security analysis programs. They can be run on the ESP32 now. The real radio demonstrations can be added later when the required hardware is available.
+Because only one ESP32 board is currently available, the solved exercises are implemented as simple Bluetooth-style simulations, packet builders, protocol models, and security analysis programs. They can be run on the ESP32 now.
 
 ## ESP32 Environment
 
@@ -52,16 +52,18 @@ Use another exercise by replacing `exo1` with `exo2`, `exo3`, etc.
 
 ## Solved Exercises
 
-### `exo1`: LoRaWAN Random Retry Intervals
+### `exo1`: Bluetooth Fallback Retry Intervals
 
-Status: solved as an ESP32 retry/backoff simulation.
+Status: solved as an ESP32 Bluetooth fallback model.
+
+The teacher allowed Bluetooth because the previous radio setup is harder to use with the current ESP32 setup. This exercise keeps the important part of the task: retrying a radio operation after a random delay.
 
 What it demonstrates:
 
-- random retry intervals for a simulated `JoinRequest`
-- random retry intervals for a simulated confirmed uplink
-- bounded retry windows using RIOT's random API
-- serial output showing each attempt and selected delay
+- simulated BLE advertising attempts
+- simulated BLE connection or acknowledgement attempts
+- random retry intervals after failed attempts
+- serial output showing each try and selected delay
 
 Commands:
 
@@ -70,48 +72,17 @@ make -C project/practice2/exo1 BOARD=esp32-wroom-32
 make -C project/practice2/exo1 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
 ```
 
-### `exo1_lorawan`: ESP32 + UMDK RF 107 LoRaWAN Test
+### `exo1_bluetooth_extra`: Extra Bluetooth Retry Demo
 
-Status: added as a real-hardware variant for an ESP32 connected to a UMDK RF 107 LoRa module.
+Status: kept as a historical folder, but converted to a Bluetooth retry demo.
 
-What it demonstrates:
+This extra folder uses only `random` and `xtimer`, like `exo1`, so it can compile on the ESP32 without extra modules.
 
-- OTAA join using RIOT's Semtech LoRaMAC package
-- random retry intervals after failed `JoinRequest`
-- confirmed uplink retry with random backoff
-- configurable SX127x wiring for the external LoRa module
-
-Default wiring:
-
-```text
-ESP32 GPIO18 -> LoRa SCK
-ESP32 GPIO19 -> LoRa MISO
-ESP32 GPIO23 -> LoRa MOSI
-ESP32 GPIO5  -> LoRa NSS/CS
-ESP32 GPIO14 -> LoRa RESET
-ESP32 GPIO26 -> LoRa DIO0
-ESP32 GPIO33 -> LoRa DIO1
-ESP32 GPIO32 -> LoRa DIO2
-3V3          -> LoRa VCC
-GND          -> LoRa GND
-```
-
-The UMDK RF 107 is treated as an SX1276-compatible LoRa radio. If your physical pinout differs from the table above, edit `exo1_lorawan/include/sx127x_params.h`.
-
-Build:
+Commands:
 
 ```bash
-make -C project/practice2/exo1_lorawan BOARD=esp32-wroom-32
-```
-
-Flash with OTAA credentials:
-
-```bash
-make -C project/practice2/exo1_lorawan BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 \
-    DEVEUI=0011223344556677 \
-    APPEUI=0102030405060708 \
-    APPKEY=00112233445566778899AABBCCDDEEFF \
-    flash term
+make -C project/practice2/exo1_bluetooth_extra BOARD=esp32-wroom-32
+make -C project/practice2/exo1_bluetooth_extra BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
 ```
 
 ### `exo2`: Packet For A Legacy RIOT Crash
@@ -213,19 +184,19 @@ make -C project/practice2/exo6 BOARD=esp32-wroom-32
 make -C project/practice2/exo6 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
 ```
 
-### `exo7`: Smart Traffic-Light Network Integration
+### `exo7`: Bluetooth Traffic-Light Network Integration
 
-Status: solved as an ESP32 network-integration model.
+Status: solved as an ESP32 Bluetooth-integration model.
 
 What it demonstrates:
 
 - traffic-light state model
-- simulated network commands from a traffic control center
+- simulated Bluetooth commands from a phone or gateway
 - status report generation
-- timing update commands
-- design justification for LoRaWAN or 6LoWPAN integration
+- acknowledgement and status messages
+- design justification for a small Bluetooth control link
 
-Hardware note: real radio integration is blocked until LoRaWAN or BLE networking hardware is available.
+Hardware note: this is a simple Bluetooth model that stays runnable on the current ESP32 setup.
 
 Commands:
 
@@ -234,7 +205,7 @@ make -C project/practice2/exo7 BOARD=esp32-wroom-32
 make -C project/practice2/exo7 BOARD=esp32-wroom-32 PORT=/dev/ttyUSB0 flash term
 ```
 
-### `exo8`: LoRaWAN Smart-Lock Security Analysis
+### `exo8`: Bluetooth Smart-Lock Security Analysis
 
 Status: solved as an ESP32 security simulation.
 
@@ -243,7 +214,7 @@ What it demonstrates:
 - a vulnerable fixed-payload `open` command
 - replay attack behavior
 - mitigation using a monotonic counter
-- jamming analysis and fail-safe design notes
+- simple Bluetooth security discussion and fail-safe design notes
 
 Commands:
 
@@ -267,9 +238,9 @@ done
 
 ## Exercises Blocked For Now
 
-- `exo9`: requires LoRaWAN Class C support, LCD, and four buttons.
+- `exo9`: requires always-on radio behavior, LCD, and four buttons.
 - `exo10`: requires several networked devices, sensors, and switches.
-- `exo11`: concerns mbed LoRaWAN RU864 support, not the current RIOT ESP32 setup.
+- `exo11`: concerns another radio stack, not the current RIOT ESP32 Bluetooth setup.
 
 ## Notes
 

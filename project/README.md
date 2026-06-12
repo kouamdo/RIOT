@@ -5,7 +5,7 @@ This directory groups the local RIOT practical assignments implemented in this r
 ## Directory Overview
 
 - `practice1`: first assignment set, focused on GPIO, timers, interrupts, memory, scheduling, shell, I2C, and UART/Modbus. These exercises avoid radio.
-- `practice2`: second assignment set, originally focused on wireless networks. Because only one ESP32 board is currently available, the solved work is mostly simulation and protocol preparation for LoRaWAN, BLE, 6LoWPAN, CoAP, and security topics.
+- `practice2`: second assignment set, originally focused on wireless networks. Because only one ESP32 board is currently available, the solved work is mostly simulation and protocol preparation for Bluetooth, BLE, 6LoWPAN, CoAP, and security topics.
 
 ## ESP32 Setup
 
@@ -62,14 +62,14 @@ Implemented or prepared exercises include:
 
 Solved ESP32-ready exercises include:
 
-- `exo1`: LoRaWAN-style random retry/backoff simulation.
+- `exo1`: Bluetooth-style random retry/backoff simulation.
 - `exo2`: packet-construction and legacy parser-safety model.
 - `exo3`: Eddystone/Skald payload preparation lab.
 - `exo4`: Cycling Speed and Cadence payload encoder.
 - `exo5`: ECG heart-rate processing simulation.
 - `exo6`: local CoAP/6LoWPAN message-flow model.
 - `exo7`: smart traffic-light network-integration model.
-- `exo8`: LoRaWAN smart-lock replay/jamming security analysis.
+- `exo8`: Bluetooth smart-lock replay and counter security analysis.
 
 Radio-dependent parts of `practice2` are intentionally marked as blocked until compatible hardware is available.
 
