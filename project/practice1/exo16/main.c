@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "atomic_utils.h"
 #include "board.h"
 #include "irq.h"
 #include "periph/gpio.h"
@@ -22,7 +23,7 @@
 #define MB_EX_ILLEGAL_ADDRESS   (0x02U)
 #define MB_EX_ILLEGAL_VALUE     (0x03U)
 
-#define MODBUS_FRAME_TIMEOUT_MS (5U)
+#define MODBUS_FRAME_TIMEOUT_US (5U * US_PER_MS)
 
 #ifndef EXO16_LED_PIN
 #define EXO16_LED_PIN GPIO2
@@ -35,8 +36,8 @@
 #define REG_LED_STATE           (3U)
 
 static volatile uint8_t rx_buffer[MODBUS_RX_BUFSIZE];
-static volatile size_t rx_len = 0;
-static volatile uint32_t last_rx_time_ms = 0;
+static volatile uint16_t rx_len;
+static volatile uint8_t frame_ready;
 
 static uint16_t holding_registers[HOLDING_REG_COUNT] = {
     [REG_TEMPERATURE] = 234U,   /* 23.4 C */
@@ -45,10 +46,18 @@ static uint16_t holding_registers[HOLDING_REG_COUNT] = {
     [REG_LED_STATE]   = 0U,
 };
 
-static uint32_t now_ms(void)
+static void frame_timeout_callback(void *arg)
 {
-    return xtimer_now_usec() / 1000U;
+    (void)arg;
+
+    if (atomic_load_u16(&rx_len) > 0U) {
+        atomic_store_u8(&frame_ready, 1U);
+    }
 }
+
+static xtimer_t frame_timer = {
+    .callback = frame_timeout_callback,
+};
 
 static uint16_t modbus_crc16(const uint8_t *data, size_t len)
 {
@@ -237,16 +246,15 @@ static void uart_rx_cb(void *arg, uint8_t data)
 {
     (void)arg;
 
-    uint32_t now = now_ms();
-
-    if ((rx_len > 0U) && ((now - last_rx_time_ms) > MODBUS_FRAME_TIMEOUT_MS)) {
-        rx_len = 0U;
+    if (atomic_load_u8(&frame_ready)) {
+        return;
     }
 
-    last_rx_time_ms = now;
+    xtimer_remove(&frame_timer);
 
     if (rx_len < MODBUS_RX_BUFSIZE) {
         rx_buffer[rx_len++] = data;
+        xtimer_set(&frame_timer, MODBUS_FRAME_TIMEOUT_US);
     }
     else {
         rx_len = 0U;
@@ -265,17 +273,19 @@ int main(void)
     uint8_t request[MODBUS_RX_BUFSIZE];
     uint8_t response[MODBUS_RX_BUFSIZE];
 
+    uint32_t loop_count = 0U;
+
     while (1) {
         size_t frame_len = 0U;
-        uint32_t current_ms = now_ms();
 
-        if ((rx_len > 0U) && ((current_ms - last_rx_time_ms) > MODBUS_FRAME_TIMEOUT_MS)) {
+        if (atomic_load_u8(&frame_ready)) {
             unsigned state = irq_disable();
             frame_len = rx_len;
             if (frame_len > 0U) {
                 memcpy(request, (const void *)rx_buffer, frame_len);
                 rx_len = 0U;
             }
+            frame_ready = 0U;
             irq_restore(state);
         }
 
@@ -287,10 +297,11 @@ int main(void)
         }
 
         /* Refresh fake sensor values to simulate changing data. */
-        holding_registers[REG_TEMPERATURE] = 230U + (uint16_t)((current_ms / 1000U) % 10U);
-        holding_registers[REG_HUMIDITY] = 450U + (uint16_t)((current_ms / 2000U) % 10U);
-        holding_registers[REG_PRESSURE] = 10130U + (uint16_t)((current_ms / 3000U) % 5U);
+        holding_registers[REG_TEMPERATURE] = 230U + (uint16_t)((loop_count / 1000U) % 10U);
+        holding_registers[REG_HUMIDITY] = 450U + (uint16_t)((loop_count / 2000U) % 10U);
+        holding_registers[REG_PRESSURE] = 10130U + (uint16_t)((loop_count / 3000U) % 5U);
 
+        loop_count++;
         xtimer_msleep(1);
     }
 

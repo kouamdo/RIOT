@@ -46,14 +46,14 @@ Implemented or prepared exercises include:
 - `exo2`: code lock with buttons and status LED.
 - `exo3`: ESP32 traffic light with pedestrian button.
 - `exo4`: Morse encoding and decoding with GPIO.
-- `exo6`: benchmark-style workload.
-- `exo7`: memory/address exploration.
+- `exo6`: non-standard workload; official Dhrystone/CoreMark still pending.
+- `exo7`: memory/address exploration across main, worker thread, and timer callback.
 - `exo8`: priority inversion demonstration.
 - `exo8_2`: deadlock demonstration.
 - `exo12`: accelerometer-based rotation counter.
 - `exo14`: RIOT shell with custom commands.
 - `exo15`: I2C address scanner.
-- `exo16`: Modbus RTU slave over console UART.
+- `exo16`: Modbus RTU slave over console UART; hardware validation pending.
 - `exo22`: exercise in progress.
 
 ## Practice 2 Summary

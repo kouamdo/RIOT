@@ -1,6 +1,6 @@
 APPLICATION = exercice_addresses
 BOARD ?= esp32-wroom-32
-RIOTBASE ?= $(CURDIR)/../..
+RIOTBASE ?= $(CURDIR)/../../..
 
 # Modules nécessaires pour l'exercice
 USEMODULE += periph_gpio

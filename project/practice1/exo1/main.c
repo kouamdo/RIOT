@@ -2,13 +2,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "atomic_utils.h"
 #include "board.h"
 #include "periph/gpio.h"
+#include "timex.h"
 #include "xtimer.h"
 
-/* Generic ESP32 setup:
- * - integrated LED usually connected to GPIO2
- * - BOOT button exposed as BTN0_PIN */
 #ifndef EXO1_LED_PIN
 #define EXO1_LED_PIN GPIO2
 #endif
@@ -17,145 +16,120 @@
 #define EXO1_BTN_PIN BTN0_PIN
 #endif
 
-#define DEBOUNCE_DELAY_MS   (50U)
-#define LONG_PRESS_MS       (1000U)
+#define DEBOUNCE_DELAY_US   (50U * US_PER_MS)
+#define LONG_PRESS_US       (1U * US_PER_SEC)
 
-static const uint16_t blink_frequencies_hz[] = {1U, 2U, 4U};
+static const uint16_t frequencies[] = { 1U, 2U, 4U };
 
-static volatile bool irq_enabled = true;
-static volatile bool debounce_pending = false;
-static volatile uint32_t debounce_deadline_ms = 0;
+static volatile uint8_t debounce_ready;
+static volatile uint8_t button_irq_enabled = 1U;
 
-static bool blink_enabled = false;
-static bool led_state = false;
-static bool button_pressed = false;
-static bool long_press_handled = false;
-static uint8_t frequency_index = 0;
-static uint32_t press_start_ms = 0;
-static uint32_t last_toggle_ms = 0;
+static bool blinking;
+static bool led_on;
+static bool button_pressed;
+static bool long_press_done;
+static uint8_t frequency_index;
+static uint32_t press_start_us;
+static uint32_t last_toggle_us;
 
-static uint32_t now_ms(void)
+static void debounce_callback(void *arg)
 {
-    return xtimer_now_usec() / 1000U;
+    (void)arg;
+    atomic_store_u8(&debounce_ready, 1U);
 }
+
+static xtimer_t debounce_timer = {
+    .callback = debounce_callback,
+};
 
 static void set_led(bool on)
 {
-    led_state = on;
+    led_on = on;
     gpio_write(EXO1_LED_PIN, on);
 }
 
-static void print_frequency(void)
+static void enable_button_irq(void)
 {
-    printf("Blink frequency: %u Hz\n", blink_frequencies_hz[frequency_index]);
+    atomic_store_u8(&button_irq_enabled, 1U);
+    gpio_irq_enable(EXO1_BTN_PIN);
 }
 
-static void handle_short_press(void)
-{
-    blink_enabled = !blink_enabled;
-    last_toggle_ms = now_ms();
-
-    if (!blink_enabled) {
-        set_led(false);
-        puts("Blinking stopped");
-    }
-    else {
-        set_led(true);
-        puts("Blinking enabled");
-        print_frequency();
-    }
-}
-
-static void handle_long_press(void)
-{
-    frequency_index = (frequency_index + 1U) %
-                      (sizeof(blink_frequencies_hz) / sizeof(blink_frequencies_hz[0]));
-    last_toggle_ms = now_ms();
-    long_press_handled = true;
-
-    puts("Long press detected");
-    print_frequency();
-}
-
-static void button_irq_handler(void *arg)
+static void button_irq(void *arg)
 {
     (void)arg;
 
-    if (!irq_enabled) {
+    if (!atomic_load_u8(&button_irq_enabled)) {
         return;
     }
 
-    irq_enabled = false;
-    debounce_pending = true;
-    debounce_deadline_ms = now_ms() + DEBOUNCE_DELAY_MS;
+    atomic_store_u8(&button_irq_enabled, 0U);
     gpio_irq_disable(EXO1_BTN_PIN);
+    xtimer_set(&debounce_timer, DEBOUNCE_DELAY_US);
 }
 
 int main(void)
 {
     puts("\n=== Exercise 1: Lamp with switch ===");
-    puts("Short press : enable or stop LED blinking");
-    puts("Long press  : change the blinking frequency");
-    puts("Method      : interrupt handling + debounce + periodic polling\n");
+    puts("Short press: start or stop blinking");
+    puts("Long press: change frequency\n");
 
     gpio_init(EXO1_LED_PIN, GPIO_OUT);
     set_led(false);
 
     if (gpio_init_int(EXO1_BTN_PIN, BTN0_MODE, BTN0_INT_FLANK,
-                      button_irq_handler, NULL) != 0) {
-        puts("Error: failed to initialize the button");
+                      button_irq, NULL) != 0) {
+        puts("Button initialization failed");
         return 1;
     }
 
-    printf("LED on GPIO%d, button on GPIO%d\n\n", EXO1_LED_PIN, EXO1_BTN_PIN);
-
     while (1) {
-        uint32_t current_ms = now_ms();
+        uint32_t now_us = xtimer_now_usec();
 
-        if (debounce_pending && (current_ms >= debounce_deadline_ms)) {
-            debounce_pending = false;
+        if (atomic_load_u8(&debounce_ready)) {
+            atomic_store_u8(&debounce_ready, 0U);
 
             if (gpio_read(EXO1_BTN_PIN) == 0) {
                 button_pressed = true;
-                long_press_handled = false;
-                press_start_ms = current_ms;
+                long_press_done = false;
+                press_start_us = now_us;
             }
             else {
-                irq_enabled = true;
-                gpio_irq_enable(EXO1_BTN_PIN);
+                enable_button_irq();
             }
         }
 
-        if (button_pressed) {
-            if ((gpio_read(EXO1_BTN_PIN) == 0) &&
-                !long_press_handled &&
-                ((current_ms - press_start_ms) >= LONG_PRESS_MS)) {
-                handle_long_press();
-            }
-
-            if (gpio_read(EXO1_BTN_PIN) != 0) {
-                button_pressed = false;
-
-                if (!long_press_handled) {
-                    handle_short_press();
-                }
-
-                irq_enabled = true;
-                gpio_irq_enable(EXO1_BTN_PIN);
-            }
+        if (button_pressed && gpio_read(EXO1_BTN_PIN) == 0 &&
+            !long_press_done &&
+            (uint32_t)(now_us - press_start_us) >= LONG_PRESS_US) {
+            frequency_index = (frequency_index + 1U) % 3U;
+            last_toggle_us = now_us;
+            long_press_done = true;
+            printf("Long press: frequency = %u Hz\n",
+                   frequencies[frequency_index]);
         }
 
-        if (blink_enabled) {
-            uint32_t half_period_ms = 500U / blink_frequencies_hz[frequency_index];
+        if (button_pressed && gpio_read(EXO1_BTN_PIN) != 0) {
+            button_pressed = false;
 
-            if ((current_ms - last_toggle_ms) >= half_period_ms) {
-                set_led(!led_state);
-                last_toggle_ms = current_ms;
+            if (!long_press_done) {
+                blinking = !blinking;
+                last_toggle_us = now_us;
+                set_led(blinking);
+                printf("Blinking %s\n", blinking ? "started" : "stopped");
+            }
+
+            enable_button_irq();
+        }
+
+        if (blinking) {
+            uint32_t half_period_us = 500000U / frequencies[frequency_index];
+
+            if ((uint32_t)(now_us - last_toggle_us) >= half_period_us) {
+                set_led(!led_on);
+                last_toggle_us = now_us;
             }
         }
 
         xtimer_msleep(10);
     }
-
-    return 0;
 }
